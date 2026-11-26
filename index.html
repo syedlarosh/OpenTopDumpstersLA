@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dumpster Distribution System | Dashboard</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+    
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
+    <style>
+        :root {
+            --bg-body: #f7f9fc;
+            --bg-panel: #111111;
+            --bg-card: #1c1c1c;
+            --text-main: #ffffff; 
+            --text-muted: #a0a0a0;
+            --text-dark: #323232;
+            --border-color: #e5e7eb;
+            --border-dark: #333333;
+            --accent-blue: #0079c1;
+            --marker-red: #d9381e;
+            --header-height: 85px;
+            --sidebar-width: 320px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main); 
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        .app-header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--header-height);
+            background: var(--bg-panel);
+            border-bottom: 3px solid var(--accent-blue);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 25px;
+            z-index: 2000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .header-left { display: flex; align-items: center; gap: 20px; }
+        .logo-container { height: 60px; display: flex; align-items: center; }
+        .logo-container img {
+            height: 100%; width: auto; object-fit: contain;
+            filter: brightness(0) invert(1);
+        }
+
+        .header-title h1 {
+            margin: 0; font-family: 'Outfit', sans-serif; font-size: 32px;
+            font-weight: 800; letter-spacing: -0.5px; color: #ffffff;
+        }
+        .header-title p {
+            margin: 4px 0 0 0; font-family: 'Outfit', sans-serif; font-size: 14px;
+            color: #999999; font-weight: 500; text-transform: uppercase; letter-spacing: 1.5px;
+        }
+
+        .basemap-control { display: flex; align-items: center; gap: 8px; }
+        .basemap-control label { font-size: 13px; color: #aaaaaa; font-weight: 600; }
+        .basemap-control select {
+            background: #222222; color: #ffffff; border: 1px solid #444;
+            padding: 6px 10px; border-radius: 4px; font-size: 13px; outline: none; cursor: pointer;
+        }
+
+        /* SIDEBAR */
+        .sidebar {
+            position: fixed; top: var(--header-height); left: 0; bottom: 0;
+            width: var(--sidebar-width); background: var(--bg-panel);
+            border-right: 1px solid var(--border-dark); padding: 20px 15px;
+            z-index: 1000; overflow-y: auto; display: flex; flex-direction: column; gap: 20px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card); border-radius: 8px; padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); display: flex;
+            flex-direction: column; align-items: flex-start; border: 1px solid var(--border-dark);
+        }
+
+        .kpi-label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+        .kpi-value { font-size: 48px; font-weight: 800; line-height: 1; font-family: 'Outfit', sans-serif; }
+        .kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+        .kpi-card.on-screen .kpi-value { color: #ffffff; font-weight: 800; }
+        .kpi-card.total-dumpsters .kpi-value { color: #888888; font-weight: 800; }
+
+        /* Filter Card */
+        .filter-card {
+            background: var(--bg-card); border-radius: 8px; padding: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); border: 1px solid var(--border-dark);
+            display: flex; flex-direction: column; gap: 15px; 
+        }
+        .filter-title { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0; }
+        
+        .sidebar-description {
+            font-family: 'Outfit', sans-serif;
+            font-style: italic;
+            font-size: 13px;
+            color: #777777;
+            line-height: 1.6;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-dark);
+            margin-top: 5px;
+        }
+        .sidebar-description span {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        /* MAP */
+        #map {
+            position: fixed; top: var(--header-height); left: var(--sidebar-width);
+            right: 0; bottom: 0; z-index: 1; background: #e5e5e5;
+        }
+
+        /* SEARCH BAR */
+        .search-container {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            display: flex; align-items: center; background: var(--bg-panel);
+            border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 300px; height: 40px; border: 1px solid var(--border-dark);
+            overflow: hidden; transition: all 0.2s ease;
+        }
+        .search-container:hover, .search-container:focus-within { box-shadow: 0 4px 20px rgba(0,0,0,0.5); border-color: var(--accent-blue); }
+        .search-container .fa-search { padding: 0 12px; color: #888888; font-size: 14px; }
+        .search-container input {
+            flex: 1; border: none; padding: 0; font-size: 14px; outline: none;
+            background: transparent; color: #ffffff; height: 100%;
+        }
+        .search-container input::placeholder { color: #666666; }
+        .search-container input::-webkit-search-cancel-button { -webkit-appearance: none; }
+        
+        #clearSearchBtn {
+            display: none;
+            background: transparent; color: #888888; border: none;
+            padding: 0 10px; cursor: pointer; font-size: 14px; transition: color 0.2s;
+        }
+        #clearSearchBtn:hover { color: #ff3b3b; }
+
+        .search-container .search-btn {
+            background: transparent; color: var(--accent-blue); border: none;
+            padding: 0 15px; height: 100%; cursor: pointer; font-size: 16px; transition: background 0.2s;
+        }
+        .search-container .search-btn:hover { background: #222222; }
+
+        /* MAP CONTROLS */
+        .leaflet-top.leaflet-right {
+            top: 20px;
+            right: 20px;
+        }
+        .leaflet-control-zoom {
+            border: none !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+            border-radius: 6px !important;
+            overflow: hidden;
+            margin-bottom: 10px !important;
+        }
+        .leaflet-control-zoom a {
+            background-color: var(--bg-panel) !important;
+            color: #ffffff !important;
+            border: 1px solid var(--border-dark) !important;
+            width: 40px !important;
+            height: 40px !important;
+            line-height: 38px !important;
+            font-size: 18px !important;
+            transition: all 0.2s ease;
+        }
+        .leaflet-control-zoom a:hover {
+            background-color: #222222 !important;
+            color: var(--accent-blue) !important;
+        }
+        .leaflet-control-zoom-in {
+            border-bottom: 1px solid var(--border-dark) !important;
+        }
+
+        /* Custom Reset View Button */
+        .custom-reset-control {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+            border-radius: 6px !important;
+            overflow: hidden;
+        }
+        .custom-reset-control button {
+            background-color: var(--bg-panel);
+            color: #ffffff;
+            border: 1px solid var(--border-dark);
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s ease;
+        }
+        .custom-reset-control button:hover {
+            background-color: #222222;
+            color: var(--accent-blue);
+        }
+
+        /* MARKERS & CLUSTERS */
+        .custom-marker {
+            background-color: var(--marker-red); border: 2px solid #ffffff;
+            border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+            width: 14px; height: 14px; display: block; transition: transform 0.2s;
+        }
+        .custom-marker:hover { transform: scale(1.3); }
+
+        .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background-color: rgba(217, 56, 30, 0.6) !important; border-radius: 50%; }
+        .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
+            background-color: var(--marker-red) !important; color: #ffffff !important;
+            font-weight: 700; font-family: 'Segoe UI', sans-serif; border-radius: 50%;
+            width: 30px; height: 30px; margin-left: 5px; margin-top: 5px;
+            display: flex; align-items: center; justify-content: center; font-size: 13px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* POPUP */
+        .leaflet-popup-content-wrapper { border-radius: 6px; box-shadow: 0 3px 14px rgba(0,0,0,0.3); padding: 0; overflow: hidden; }
+        .leaflet-popup-content { margin: 0; font-size: 13px; line-height: 1.5; width: 260px !important; }
+        .popup-header {
+            background: #f8f8f8; padding: 12px 15px; border-bottom: 1px solid var(--border-color);
+            font-weight: 700; font-size: 15px; color: var(--text-dark);
+        }
+        .popup-body { padding: 15px; color: var(--text-dark); }
+        .popup-row { display: flex; margin-bottom: 6px; }
+        .popup-label { width: 35%; color: #6b6b6b; font-weight: 600; }
+        .popup-value { width: 65%; color: var(--text-dark); }
+        
+        .popup-link {
+            display: block; margin-top: 15px; padding: 10px; background: var(--accent-blue);
+            color: #ffffff !important; font-weight: 700 !important; text-align: center;
+            text-decoration: none; border-radius: 4px; font-size: 13px; transition: background 0.2s;
+        }
+        .popup-link:hover { background: #005a91; }
+
+        /* Loader */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-panel); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 9999;
+        }
+        .spinner {
+            border: 4px solid #333; border-top: 4px solid var(--accent-blue);
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* SELECT2 DARK THEME */
+        .select2-container--default .select2-selection--single {
+            background-color: #222222; border: 1px solid #444; border-radius: 6px;
+            height: 42px; display: flex; align-items: center;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            color: #ffffff; line-height: normal; padding-left: 12px; font-size: 14px;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 40px; right: 10px;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow b { border-color: #888 transparent transparent transparent; }
+        .select2-container--default.select2-container--open .select2-selection--single .select2-selection__arrow b { border-color: transparent transparent var(--accent-blue) transparent; }
+        .select2-container--default .select2-selection--single:focus,
+        .select2-container--default.select2-container--focus .select2-selection--single { border-color: var(--accent-blue); outline: none; }
+        
+        .select2-dropdown { background-color: #222222; border: 1px solid #444; border-radius: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); overflow: hidden; }
+        .select2-search--dropdown { padding: 10px; background: #1c1c1c; }
+        .select2-search--dropdown .select2-search__field {
+            background-color: #111111 !important; border: 1px solid #444 !important;
+            color: #ffffff !important; border-radius: 4px; padding: 8px; outline: none;
+        }
+        .select2-search--dropdown .select2-search__field:focus { border-color: var(--accent-blue) !important; }
+        .select2-results__option { padding: 10px 15px; font-size: 14px; color: #ffffff; }
+        .select2-container--default .select2-results__option--highlighted[aria-selected] { background-color: var(--accent-blue); color: #ffffff; }
+        .select2-container--default .select2-results__option[aria-selected=true] { background-color: #333333; color: #ffffff; }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="loader">
+        <div class="spinner"></div>
+        <div style="color: #888; font-size: 14px;">Loading Data...</div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo-container">
+                <img src="Wilkerson.png" alt="Wilkerson Logo" onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=\'font-family:Outfit;font-weight:800;font-size:32px;color:#ffffff;\'>WILKERSON</span>';">
+            </div>
+            <div class="header-title">
+                <h1>Open Top Roll-off Dumpsters in Los Angeles</h1>
+                <p>Location Intelligence Dashboard</p>
+            </div>
+        </div>
+        <div class="basemap-control">
+            <label>Basemap:</label>
+            <select id="basemapSelect">
+                <option value="google-satellite" selected>Imagery</option>
+                <option value="google-grey">Light Gray Canvas</option>
+                <option value="dark">Dark Gray Canvas</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="kpi-card on-screen">
+            <span class="kpi-label">On Screen</span>
+            <span class="kpi-value" id="inViewCount">0</span>
+            <span class="kpi-sub">Currently visible</span>
+        </div>
+
+        <div class="kpi-card total-dumpsters">
+            <span class="kpi-label">Total Dumpsters</span>
+            <span class="kpi-value" id="totalCount">0</span>
+            <span class="kpi-sub" id="totalSub">All locations</span>
+        </div>
+
+        <div class="filter-card">
+            <div class="filter-title">Filter by ZIP Code</div>
+            <select id="zipFilter" style="width: 100%;">
+                <option value="all">All ZIP Codes</option>
+            </select>
+            
+            <div class="sidebar-description">
+                These mapped locations represent active <span>Open Top Dumpsters</span> distributed across the Los Angeles area. Use the filter above to explore specific zones.
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAP -->
+    <div id="map">
+        <!-- SEARCH BAR -->
+        <div class="search-container">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="e.g., Los Angeles" autocomplete="off" onkeypress="handleSearch(event)">
+            <button id="clearSearchBtn" title="Clear Search"><i class="fas fa-times"></i></button>
+            <button class="search-btn" onclick="executeSearch()" title="Search"><i class="fas fa-arrow-right"></i></button>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    
+    <!-- jQuery & Select2 JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 1. NUMBER COUNTER ANIMATION FUNCTION
+        // ==========================================
+        function animateValue(obj, start, end, duration) {
+            if (!obj) return;
+            
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                
+                // Easing function (easeOutQuart) for smooth stopping
+                const easeOutProgress = 1 - Math.pow(1 - progress, 4);
+                
+                const currentVal = Math.floor(easeOutProgress * (end - start) + start);
+                obj.innerHTML = currentVal.toLocaleString();
+                
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = end.toLocaleString(); // Ensure exact final number
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // 1. Initialize Map
+        const map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([34.0522, -118.2437], 10);
+
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        
+        // ==========================================
+        // CUSTOM HOME / RESET CONTROL
+        // ==========================================
+        const resetControl = L.Control.extend({
+            options: { position: 'topright' },
+            onAdd: function (map) {
+                const container = L.DomUtil.create('div', 'leaflet-bar custom-reset-control');
+                const btn = L.DomUtil.create('button', '', container);
+                btn.innerHTML = '<i class="fas fa-home"></i>';
+                btn.title = "Reset Map to Default View";
+                
+                L.DomEvent.disableClickPropagation(container);
+                
+                L.DomEvent.on(btn, 'click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    resetMapView();
+                });
+                
+                return container;
+            }
+        });
+        map.addControl(new resetControl());
+        
+        L.control.attribution({ position: 'bottomright', prefix: 'Powered by Esri | Leaflet' }).addTo(map);
+
+        // 2. Basemaps
+        const basemaps = {
+            "dark": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20 }),
+            "google-grey": L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 20 }),
+            "google-satellite": L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20 })
+        };
+
+        let currentBasemap = basemaps["google-satellite"];
+        currentBasemap.addTo(map);
+
+        document.getElementById('basemapSelect').addEventListener('change', function(e) {
+            if (currentBasemap) map.removeLayer(currentBasemap);
+            currentBasemap = basemaps[e.target.value];
+            currentBasemap.addTo(map);
+        });
+
+        // ==========================================
+        // SEARCH FUNCTIONALITY
+        // ==========================================
+        let searchMarker = null;
+
+        function handleSearch(event) {
+            if (event.key === 'Enter') executeSearch();
+        }
+
+        function executeSearch() {
+            const query = document.getElementById('searchInput').value;
+            if (!query) return;
+
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        const lat = data[0].lat;
+                        const lon = data[0].lon;
+                        map.setView([lat, lon], 14);
+
+                        if (searchMarker) map.removeLayer(searchMarker);
+
+                        searchMarker = L.circleMarker([lat, lon], {
+                            radius: 10, fillColor: "#0079c1", color: "#ffffff",
+                            weight: 3, opacity: 1, fillOpacity: 1
+                        }).addTo(map).bindPopup(`<b>Searched:</b><br>${data[0].display_name}`).openPopup();
+                        
+                        document.getElementById('clearSearchBtn').style.display = 'block';
+                    } else {
+                        alert("Location not found! Please try a different query.");
+                    }
+                })
+                .catch(error => {
+                    console.error("Search Error:", error);
+                    alert("Search failed. Ensure you are using a Live Server.");
+                });
+        }
+
+        document.getElementById('clearSearchBtn').addEventListener('click', function() {
+            if (searchMarker) {
+                map.removeLayer(searchMarker);
+                searchMarker = null;
+            }
+            document.getElementById('searchInput').value = '';
+            this.style.display = 'none';
+        });
+
+        // ==========================================
+        // RESET MAP VIEW
+        // ==========================================
+        function resetMapView() {
+            if (searchMarker) {
+                map.removeLayer(searchMarker);
+                searchMarker = null;
+            }
+            document.getElementById('searchInput').value = '';
+            document.getElementById('clearSearchBtn').style.display = 'none';
+
+            if (currentZipLayer) {
+                map.removeLayer(currentZipLayer);
+                currentZipLayer = null;
+            }
+
+            if ($('#zipFilter').data('select2')) {
+                $('#zipFilter').val('all').trigger('change.select2'); 
+            } else {
+                $('#zipFilter').val('all');
+            }
+
+            if (typeof filterByZip === 'function') {
+                filterByZip('all');
+            } else {
+                filteredFeatures = allFeatures;
+                renderDumpsters(filteredFeatures);
+                
+                // Reset Animations Here
+                animateValue(document.getElementById('totalCount'), 0, allFeatures.length, 1000);
+                document.getElementById('totalSub').textContent = "All locations";
+                
+                const tempLayer = L.geoJSON({ type: 'FeatureCollection', features: allFeatures });
+                const b = tempLayer.getBounds();
+                if (b.isValid()) map.fitBounds(b, { padding: [50, 50] });
+            }
+        }
+
+        // ==========================================
+        // MARKERS & CLUSTERS
+        // ==========================================
+        const customIcon = L.divIcon({
+            className: 'custom-marker',
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+        });
+
+        const markersCluster = L.markerClusterGroup({
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true,
+            spiderfyOnMaxZoom: true,
+            maxClusterRadius: 50,
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                let size = 'small';
+                if (count >= 100) size = 'large';
+                else if (count >= 10) size = 'medium';
+                return L.divIcon({
+                    html: `<div><span>${count}</span></div>`,
+                    className: `marker-cluster marker-cluster-${size}`,
+                    iconSize: new L.Point(40, 40)
+                });
+            }
+        });
+        map.addLayer(markersCluster);
+
+        // ==========================================
+        // DATA VARIABLES
+        // ==========================================
+        const pointsGeoJsonFile = 'Open_Top_Dumpsters.geojson';
+        const zipGeoJsonFile = 'ZIPCODE.geojson';
+        
+        let allFeatures = [];
+        let filteredFeatures = [];
+        let geoJsonLayer = null;
+        
+        let zipBoundariesData = null;
+        let currentZipLayer = null;
+
+        // ==========================================
+        // POPUP BUILDERS
+        // ==========================================
+        function createDumpsterPopup(feature) {
+            const props = feature.properties;
+            let sourceHtml = '';
+            
+            if (props.Source) {
+                const src = String(props.Source).trim();
+                let url = '';
+                if (src.startsWith('http')) url = src;
+                else if (src.startsWith('www')) url = `https://${src}`;
+                else if (src.toLowerCase().includes('open map')) {
+                    const lat = feature.geometry.coordinates[1];
+                    const lng = feature.geometry.coordinates[0];
+                    url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                }
+                if (url) sourceHtml = `<a href="${url}" target="_blank" class="popup-link">Open in Google Maps</a>`;
+            }
+
+            return `
+                <div class="popup-header">${props.PO_Name || 'Dumpster Location'}</div>
+                <div class="popup-body">
+                    <div class="popup-row"><span class="popup-label">ID:</span><span class="popup-value">${props.ID || 'N/A'}</span></div>
+                    <div class="popup-row"><span class="popup-label">ZIP Code:</span><span class="popup-value">${props.ZIP_CODE || 'N/A'}</span></div>
+                    <div class="popup-row"><span class="popup-label">Address:</span><span class="popup-value">${props.Address || 'N/A'}</span></div>
+                    <div class="popup-row"><span class="popup-label">Zone:</span><span class="popup-value">${props.ZONE || 'N/A'}</span></div>
+                    <div class="popup-row"><span class="popup-label">County:</span><span class="popup-value">${props.County || 'N/A'}</span></div>
+                    ${sourceHtml}
+                </div>
+            `;
+        }
+
+        function createZipPopup(feature) {
+            const props = feature.properties;
+            let zipVal = props.ZIPCODE || props.Zipcode || props.zipcode || 'N/A';
+            return `
+                <div class="popup-header" style="background:#f0f8ff; color:#0079c1;">
+                    ZIP Code Boundary
+                </div>
+                <div class="popup-body" style="text-align:center; padding: 20px;">
+                    <div style="font-size: 24px; font-weight: 800; color: #323232;">${zipVal}</div>
+                </div>
+            `;
+        }
+
+        // ==========================================
+        // RENDER DUMPSTERS
+        // ==========================================
+        function renderDumpsters(features) {
+            if (geoJsonLayer) markersCluster.removeLayer(geoJsonLayer);
+
+            geoJsonLayer = L.geoJSON(
+                { type: 'FeatureCollection', features: features },
+                {
+                    pointToLayer: (feature, latlng) => L.marker(latlng, { icon: customIcon }),
+                    onEachFeature: (feature, layer) => {
+                        layer.bindPopup(createDumpsterPopup(feature), { maxWidth: 300 });
+                    }
+                }
+            );
+
+            markersCluster.addLayer(geoJsonLayer);
+            
+            // Reset On-Screen Count Animation (Quick 0.5s)
+            setTimeout(() => {
+                updateInViewCount(true);
+            }, 100);
+        }
+
+        // ==========================================
+        // GLOBAL FILTER FUNCTION
+        // ==========================================
+        let filterByZip = function(val) {
+            if (currentZipLayer) {
+                map.removeLayer(currentZipLayer);
+                currentZipLayer = null;
+            }
+
+            if (val === 'all') {
+                filteredFeatures = allFeatures;
+                
+                // Animate Total Count (1 Second)
+                animateValue(document.getElementById('totalCount'), 0, allFeatures.length, 1000);
+                
+                document.getElementById('totalSub').textContent = "All locations";
+                renderDumpsters(filteredFeatures);
+                
+                const tempLayer = L.geoJSON({ type: 'FeatureCollection', features: allFeatures });
+                const b = tempLayer.getBounds();
+                if (b.isValid()) map.fitBounds(b, { padding: [50, 50] });
+
+            } else {
+                filteredFeatures = allFeatures.filter(f =>
+                    String(f.properties?.ZIP_CODE || '').trim() === val
+                );
+                
+                // Animate Total Count (1 Second)
+                animateValue(document.getElementById('totalCount'), 0, filteredFeatures.length, 1000);
+                
+                document.getElementById('totalSub').textContent = `ZIP: ${val}`;
+                renderDumpsters(filteredFeatures);
+
+                const matchingZipFeature = zipBoundariesData.features.find(f => 
+                    String(f.properties?.ZIPCODE || f.properties?.Zipcode || f.properties?.zipcode).trim() === val
+                );
+
+                if (matchingZipFeature) {
+                    currentZipLayer = L.geoJSON(matchingZipFeature, {
+                        style: {
+                            color: '#0079c1', weight: 2, opacity: 0.8,
+                            fillColor: '#0079c1', fillOpacity: 0.15
+                        },
+                        onEachFeature: (feature, layer) => {
+                            layer.bindPopup(createZipPopup(feature));
+                        }
+                    }).addTo(map);
+
+                    const bounds = currentZipLayer.getBounds();
+                    if (bounds.isValid()) {
+                        map.fitBounds(bounds, { padding: [20, 20] });
+                    }
+                } else {
+                    if (filteredFeatures.length > 0) {
+                        const tempLayer = L.geoJSON({ type: 'FeatureCollection', features: filteredFeatures });
+                        const b = tempLayer.getBounds();
+                        if (b.isValid()) map.fitBounds(b, { padding: [50, 50] });
+                    }
+                }
+            }
+        };
+
+        // ==========================================
+        // FETCH BOTH FILES
+        // ==========================================
+        Promise.all([
+            fetch(pointsGeoJsonFile).then(r => { if(!r.ok) throw new Error('Dumpsters file missing'); return r.json(); }),
+            fetch(zipGeoJsonFile).then(r => { if(!r.ok) throw new Error('ZIPCODE file missing'); return r.json(); })
+        ])
+        .then(([pointsData, zipData]) => {
+            allFeatures = pointsData.features || [];
+            filteredFeatures = allFeatures;
+
+            zipBoundariesData = zipData;
+
+            // Collect ZIPs
+            const zipSet = new Set();
+            allFeatures.forEach(f => {
+                const z = f.properties?.ZIP_CODE;
+                if (z && String(z).trim() !== '' && String(z).toLowerCase() !== 'null') {
+                    zipSet.add(String(z).trim());
+                }
+            });
+            
+            const sortedZips = Array.from(zipSet).sort();
+            const zipSelect = document.getElementById('zipFilter');
+            
+            sortedZips.forEach(z => {
+                const opt = document.createElement('option');
+                opt.value = z;
+                opt.textContent = z;
+                zipSelect.appendChild(opt);
+            });
+
+            // INITIALIZE SELECT2
+            $(zipSelect).select2({
+                placeholder: "Search ZIP Code...",
+                allowClear: false,
+                width: '100%'
+            });
+
+            // Bind Select2 to our global filter function
+            $(zipSelect).on('select2:select', function (e) {
+                const val = e.params.data.id;
+                filterByZip(val);
+            });
+
+            // Initial Render
+            renderDumpsters(filteredFeatures);
+
+            if (filteredFeatures.length > 0) {
+                const tempLayer = L.geoJSON({ type: 'FeatureCollection', features: filteredFeatures });
+                const b = tempLayer.getBounds();
+                if (b.isValid()) map.fitBounds(b, { padding: [50, 50] });
+            }
+
+            // --- ANIMATION ON INITIAL LOAD (2 Seconds) ---
+            // Thori der bad animation shuru hogi taake map load ho jaye
+            setTimeout(() => {
+                // 1. Animate Total Count
+                animateValue(document.getElementById('totalCount'), 0, allFeatures.length, 2000);
+                document.getElementById('totalSub').textContent = "All locations";
+
+                // 2. Animate On-Screen Count
+                const b = map.getBounds();
+                let initialViewCount = 0;
+                allFeatures.forEach(f => {
+                    if (f.geometry?.coordinates) {
+                        const [lng, lat] = f.geometry.coordinates;
+                        if (b.contains([lat, lng])) initialViewCount++;
+                    }
+                });
+                animateValue(document.getElementById('inViewCount'), 0, initialViewCount, 2000);
+            }, 200);
+
+            // Hide Loader
+            const loader = document.getElementById('loader');
+            loader.style.opacity = '0';
+            setTimeout(() => { loader.style.display = 'none'; }, 300);
+        })
+        .catch(err => {
+            console.error('Data Load Error:', err);
+            document.getElementById('loader').innerHTML = `
+                <div style="color: #ff5555; text-align: center; padding: 30px; max-width: 400px;">
+                    <h3>⚠️ Data Load Error</h3>
+                    <p style="font-size: 13px; color: #888; margin-top: 10px;">
+                        Make sure both files <b>"${pointsGeoJsonFile}"</b> and <b>"${zipGeoJsonFile}"</b> exist in the same folder, and you are using Live Server.
+                    </p>
+                </div>
+            `;
+        });
+
+        // ==========================================
+        // UPDATE IN-VIEW COUNT (With Animation Trigger)
+        // ==========================================
+        function updateInViewCount(forceAnimate = false) {
+            if (!filteredFeatures || filteredFeatures.length === 0) {
+                document.getElementById('inViewCount').textContent = '0';
+                return;
+            }
+            const b = map.getBounds();
+            let count = 0;
+            filteredFeatures.forEach(f => {
+                if (f.geometry?.coordinates) {
+                    const [lng, lat] = f.geometry.coordinates;
+                    if (b.contains([lat, lng])) count++;
+                }
+            });
+            
+            // Agar map move ho raha hai to direct update karein, 
+            // Agar forceAnimate true hai to animation lagayen (0.5 seconds)
+            if (forceAnimate) {
+                animateValue(document.getElementById('inViewCount'), 0, count, 500);
+            } else {
+                document.getElementById('inViewCount').textContent = count.toLocaleString();
+            }
+        }
+
+        map.on('moveend', () => updateInViewCount(false));
+        map.on('zoomend', () => updateInViewCount(false));
+    </script>
+</body>
+</html>
